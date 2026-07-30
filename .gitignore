@@ -1,0 +1,14 @@
+﻿__pycache__/
+*.pyc
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+InvoiceDb.db
+from_settings.json
+*.pdf
+_test_*.pdf
+_git_out.txt
+.DS_Store
+Thumbs.db
