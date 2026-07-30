@@ -1,4 +1,4 @@
-"""SQLite vrstva — schéma a CRUD podľa C# BfGarden Invoice."""
+"""SQLite layer — schema and CRUD for Invoice v2.0."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from config import DB_PATH
 
 @contextmanager
 def connect() -> Iterator[sqlite3.Connection]:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -26,7 +27,9 @@ def connect() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def init_db() -> None:
+def init_db() -> bool:
+    """Create InvoiceDb.db (and tables) if missing. Returns True if a new file was created."""
+    created_new = not DB_PATH.exists()
     with connect() as conn:
         conn.executescript(
             """
@@ -76,6 +79,7 @@ def init_db() -> None:
             LIMIT 1;
             """
         )
+    return created_new
 
 
 def _upper(value: str) -> str:

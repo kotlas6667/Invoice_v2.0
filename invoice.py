@@ -1,6 +1,5 @@
 """
-BF Garden Invoice v2.0
-Moderný rewrite C# WinForms aplikácie Butterfly Gardens.
+Invoice v2.0 — modern invoice desktop app.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ def _add_month(d: date) -> date:
 
 
 class ClientAutocomplete:
-    """Dropdown návrhov klientov pri písaní (Name / Surname / Company)."""
+    """Client suggestion dropdown while typing (Name / Surname / Company)."""
 
     MAX_ITEMS = 10
 
@@ -292,7 +291,7 @@ class Section(ctk.CTkFrame):
 class InvoiceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("BF Garden Invoice")
+        self.title("Invoice")
         self.configure(fg_color=COLORS["bg"])
         self._center(WIDTH, HEIGHT)
         self.minsize(960, 680)
@@ -337,12 +336,14 @@ class InvoiceApp(ctk.CTk):
             font=ctk.CTkFont(family=FONT, size=22, weight="bold"),
             text_color="#FFFFFF",
         ).pack(side="left")
-        ctk.CTkLabel(
+        company_name = (load_company().get("company") or "").strip()
+        self.lbl_header_company = ctk.CTkLabel(
             left,
-            text="  Butterfly Gardens",
+            text=f"  {company_name}" if company_name else "",
             font=ctk.CTkFont(family=FONT, size=13),
             text_color="#5EEAD4",
-        ).pack(side="left", pady=(6, 0))
+        )
+        self.lbl_header_company.pack(side="left", pady=(6, 0))
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
         actions.grid(row=0, column=2, sticky="e", padx=18)
@@ -493,7 +494,7 @@ class InvoiceApp(ctk.CTk):
         tip_row.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             tip_row,
-            text="Tip: začni písať — návrhy z DB (↑↓ Enter)",
+            text="Tip: start typing — suggestions from DB (↑↓ Enter)",
             font=ctk.CTkFont(family=FONT, size=11),
             text_color=COLORS["text_muted"],
             anchor="w",
@@ -690,7 +691,7 @@ class InvoiceApp(ctk.CTk):
 
         ctk.CTkLabel(
             foot,
-            text="Created by Tomáš Horvát  ·  Invoice v2.0",
+            text="Invoice v2.0",
             font=ctk.CTkFont(family=FONT, size=11),
             text_color=COLORS["text_muted"],
         ).grid(row=0, column=0, sticky="w")
@@ -923,6 +924,11 @@ class InvoiceApp(ctk.CTk):
         try:
             save_company(values)
             COMPANY.update(values)
+            company_name = (values.get("company") or "").strip()
+            if hasattr(self, "lbl_header_company"):
+                self.lbl_header_company.configure(
+                    text=f"  {company_name}" if company_name else ""
+                )
             messagebox.showinfo("From", "From settings saved.\nThey will load automatically next time.")
         except OSError as exc:
             messagebox.showerror("From", f"Could not save settings:\n{exc}")

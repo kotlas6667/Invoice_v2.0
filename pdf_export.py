@@ -1,4 +1,4 @@
-"""Generovanie PDF faktúr (reportlab)."""
+"""PDF invoice export (reportlab)."""
 
 from __future__ import annotations
 
@@ -196,7 +196,8 @@ def build_invoice_pdf(invoice_number: int, output_path: Path) -> Path:
         story.append(Paragraph(terms.replace("\n", "<br/>"), body))
 
     story.append(Spacer(1, 18))
-    story.append(Paragraph("Butterfly Gardens · BF Garden Invoice", muted))
+    footer_name = _safe(company.get("company")) or "Invoice"
+    story.append(Paragraph(f"{footer_name} · Invoice v2.0", muted))
 
     doc.build(story)
     return output_path

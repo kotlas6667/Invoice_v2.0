@@ -1,4 +1,4 @@
-"""Prehliadač uložených faktúr — ekvivalent FrmInvoiceDB."""
+"""Saved invoices browser."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pdf_export import export_invoices_to_folder
 
 
 class DatePickerField(ctk.CTkFrame):
-    """Menší textbox + tlačidlo kalendára vpravo."""
+    """Smaller date textbox + calendar button on the right."""
 
     def __init__(
         self,
@@ -222,7 +222,7 @@ class DatePickerField(ctk.CTkFrame):
 
 
 class SearchableCombo(ctk.CTkFrame):
-    """Combo s písaním + live filtrovaním položiek."""
+    """Editable combo with live filtering."""
 
     MAX_VISIBLE = 12
 

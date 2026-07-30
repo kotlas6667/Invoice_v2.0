@@ -1,4 +1,4 @@
-"""Predvolené nastavenia firmy Butterfly Gardens."""
+"""Application configuration for Invoice v2.0."""
 
 from __future__ import annotations
 
@@ -6,22 +6,18 @@ import json
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
-# Testovacia DB z C# projektu (bin/Debug)
-DB_PATH = Path(
-    r"C:\PROGRAMING_SYNCHRO_DISK\PROGRAMOVANIE\5.C#.NET\Invoice"
-    r"\SL_BfGarden Invoice_12\BfGarden Invoice\bin\Debug\InvoiceDb_test.db"
-)
+DB_PATH = APP_DIR / "InvoiceDb.db"
 FROM_SETTINGS_PATH = APP_DIR / "from_settings.json"
 
 DEFAULT_COMPANY = {
-    "company": "Butterfly Gardens",
-    "name": "Roman Horvath",
-    "address": "8. Brookside",
-    "city": "Hertford",
-    "zip": "SG137LL",
-    "country": "England",
-    "account": "33243768",
-    "sort_code": "30-84-85",
+    "company": "",
+    "name": "",
+    "address": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "account": "",
+    "sort_code": "",
 }
 
 
@@ -40,22 +36,20 @@ def load_company() -> dict[str, str]:
 
 
 def save_company(values: dict[str, str]) -> None:
-    data = {key: str(values.get(key, DEFAULT_COMPANY[key]) or "") for key in DEFAULT_COMPANY}
+    data = {key: str(values.get(key, "") or "") for key in DEFAULT_COMPANY}
     FROM_SETTINGS_PATH.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
 
-# Aktuálne From hodnoty (načítané zo súboru / default)
 COMPANY = load_company()
 
-DEFAULT_ITEM = "Garden services"
-DEFAULT_CLIENT_COUNTRY = "England"
+DEFAULT_ITEM = ""
+DEFAULT_CLIENT_COUNTRY = ""
 DEFAULT_TAX_PERCENT = "0"
 CURRENCY = "£"
 
-# Moderný dizajn (teal / slate — nie purple)
 COLORS = {
     "bg": "#F0F2F5",
     "surface": "#FFFFFF",
