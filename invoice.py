@@ -22,7 +22,9 @@ from config import (
     FOOTER_RESERVE,
     HEADER_RESERVE,
     HEIGHT,
+    ITEMS_MAX_HEIGHT,
     ITEMS_MIN_HEIGHT,
+    ITEMS_PREF_HEIGHT,
     LAYOUT_CHROME,
     TOP_MAX_HEIGHT,
     TOP_MIN_HEIGHT,
@@ -342,7 +344,7 @@ class InvoiceApp(ctk.CTk):
         self._layout_after_id = self.after(80, self._apply_responsive_layout)
 
     def _apply_responsive_layout(self) -> None:
-        """Keep Items box visible: cap top panels, guarantee items min height."""
+        """Keep Items a compact band; leftover height goes to top panels."""
         self._layout_after_id = None
         try:
             total_h = int(self.winfo_height())
@@ -351,39 +353,42 @@ class InvoiceApp(ctk.CTk):
         if total_h < 100:
             return
 
-        reserved = HEADER_RESERVE + FOOTER_RESERVE + LAYOUT_CHROME + ITEMS_MIN_HEIGHT
-        top_h = max(TOP_MIN_HEIGHT, min(TOP_MAX_HEIGHT, total_h - reserved))
+        items_area = ITEMS_PREF_HEIGHT
+        # On very short windows, shrink slightly but keep headers + one row.
+        room = total_h - HEADER_RESERVE - FOOTER_RESERVE - LAYOUT_CHROME - TOP_MIN_HEIGHT
+        if room < ITEMS_PREF_HEIGHT:
+            items_area = max(ITEMS_MIN_HEIGHT, min(ITEMS_MAX_HEIGHT, room))
+
+        top_h = max(
+            TOP_MIN_HEIGHT,
+            min(
+                TOP_MAX_HEIGHT,
+                total_h - HEADER_RESERVE - FOOTER_RESERVE - LAYOUT_CHROME - items_area,
+            ),
+        )
+
         if hasattr(self, "top_container"):
             self.top_container.configure(height=top_h)
-            self.top_container.grid_propagate(False)
 
-        # Floor height for the whole Items card (title + columns + rows).
-        chrome_in_card = 90
-        items_area = max(
-            ITEMS_MIN_HEIGHT,
-            total_h - HEADER_RESERVE - FOOTER_RESERVE - LAYOUT_CHROME - top_h,
-        )
+        chrome_in_card = 78
         if hasattr(self, "items_card"):
             self.items_card.configure(height=items_area)
-            self.items_card.grid_propagate(False)
         if hasattr(self, "items_frame"):
-            self.items_frame.configure(height=max(120, items_area - chrome_in_card))
+            self.items_frame.configure(height=max(36, items_area - chrome_in_card))
 
     # ── UI ──────────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_rowconfigure(2, weight=1, minsize=ITEMS_MIN_HEIGHT)
+        # Pack from the edges first so Items stays a compact band under the form.
         self._build_header()
-        self._build_top_sections()
-        self._build_items_section()
         self._build_footer()
+        self._build_items_section()
+        self._build_top_sections()
 
     def _build_header(self) -> None:
         bar = ctk.CTkFrame(self, fg_color=COLORS["header"], corner_radius=0, height=62)
-        bar.grid(row=0, column=0, sticky="ew")
-        bar.grid_propagate(False)
+        bar.pack(fill="x", side="top")
+        bar.pack_propagate(False)
         bar.grid_columnconfigure(1, weight=1)
 
         left = ctk.CTkFrame(bar, fg_color="transparent")
@@ -469,8 +474,8 @@ class InvoiceApp(ctk.CTk):
             height=TOP_MAX_HEIGHT,
             corner_radius=0,
         )
-        self.top_container.grid(row=1, column=0, sticky="ew", padx=16, pady=(14, 6))
-        self.top_container.grid_propagate(False)
+        self.top_container.pack(fill="both", expand=True, padx=16, pady=(14, 6))
+        self.top_container.pack_propagate(False)
 
         self.top_wrap = ctk.CTkScrollableFrame(
             self.top_container,
@@ -706,12 +711,12 @@ class InvoiceApp(ctk.CTk):
             corner_radius=14,
             border_width=1,
             border_color=COLORS["border"],
-            height=ITEMS_MIN_HEIGHT,
+            height=ITEMS_PREF_HEIGHT,
         )
         card = self.items_card
-        card.grid(row=2, column=0, sticky="nsew", padx=16, pady=6)
-        # Prevent children from collapsing the card on short / scaled screens.
-        card.grid_propagate(False)
+        # Dock above the footer — fixed height, no vertical expand.
+        card.pack(fill="x", padx=16, pady=6, side="bottom")
+        card.pack_propagate(False)
 
         head = ctk.CTkFrame(card, fg_color="transparent")
         head.pack(fill="x", padx=16, pady=(12, 4))
@@ -763,7 +768,7 @@ class InvoiceApp(ctk.CTk):
         self.items_frame = ctk.CTkScrollableFrame(
             card,
             fg_color="transparent",
-            height=140,
+            height=56,
         )
         self.items_frame.pack(fill="both", expand=True, padx=10, pady=(4, 10))
         self.items_frame.grid_columnconfigure(0, weight=1)
@@ -778,7 +783,7 @@ class InvoiceApp(ctk.CTk):
 
     def _build_footer(self) -> None:
         foot = ctk.CTkFrame(self, fg_color="transparent")
-        foot.grid(row=3, column=0, sticky="ew", padx=16, pady=(4, 14))
+        foot.pack(fill="x", padx=16, pady=(4, 14), side="bottom")
         foot.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
