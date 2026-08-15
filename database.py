@@ -168,11 +168,34 @@ def insert_client(client: Client) -> int:
         return int(cur.lastrowid)
 
 
+def update_client(client_id: int, client: Client) -> None:
+    """Persist Bill-to field changes for an existing client row."""
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE invoiceBaseInfo
+            SET companyClient = ?, addressClient = ?, cityClient = ?, zipClient = ?,
+                countryClient = ?, nameClient = ?, surnameClient = ?
+            WHERE id = ?
+            """,
+            (
+                _upper(client.company),
+                client.address.strip(),
+                client.city.strip(),
+                client.zip.strip(),
+                client.country.strip(),
+                _upper(client.name),
+                _upper(client.surname),
+                client_id,
+            ),
+        )
+
+
 def ensure_client(client: Client) -> int:
     existing = find_client(client.surname, client.company)
     if existing and existing.id is not None:
-        # Konflikt: rovnaké priezvisko, iná firma už by našiel iný záznam;
-        # tu kontrolujeme či firma sedí — find_client už vyžaduje oboje.
+        # Keep client master data in sync with the form (name/address/city/…).
+        update_client(existing.id, client)
         return existing.id
     # Kontrola konfliktu priezviska s inou firmou
     for other in load_clients():
@@ -181,6 +204,33 @@ def ensure_client(client: Client) -> int:
                 "Surname has diferent Company name !!!!, Please change Surname"
             )
     return insert_client(client)
+
+
+def _insert_invoice_items(
+    conn: sqlite3.Connection,
+    invoice_number: int,
+    tax_percent: float,
+    items: list[InvoiceItem],
+    *,
+    canceled: int = 0,
+) -> None:
+    for item in items:
+        conn.execute(
+            """
+            INSERT INTO itemsValues
+            (itemDesc, itemQty, itemRate, itemAmount, salesTax, idInvoice, canceled)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item.description,
+                item.qty,
+                item.rate,
+                item.amount,
+                tax_percent,
+                invoice_number,
+                canceled,
+            ),
+        )
 
 
 def save_invoice(
@@ -192,6 +242,8 @@ def save_invoice(
     tax_percent: float,
     items: list[InvoiceItem],
 ) -> int:
+    if not items:
+        raise ValueError("Invoice must contain at least one item.")
     client_id = ensure_client(client)
     with connect() as conn:
         cur = conn.execute(
@@ -202,22 +254,48 @@ def save_invoice(
             (client_id, invoice_date, due_date, notes, terms),
         )
         invoice_number = int(cur.lastrowid)
-        for item in items:
-            conn.execute(
-                """
-                INSERT INTO itemsValues
-                (itemDesc, itemQty, itemRate, itemAmount, salesTax, idInvoice, canceled)
-                VALUES (?, ?, ?, ?, ?, ?, 0)
-                """,
-                (
-                    item.description,
-                    item.qty,
-                    item.rate,
-                    item.amount,
-                    tax_percent,
-                    invoice_number,
-                ),
-            )
+        if invoice_number <= 0:
+            raise RuntimeError("Failed to allocate invoice number.")
+        _insert_invoice_items(conn, invoice_number, tax_percent, items, canceled=0)
+    return invoice_number
+
+
+def update_invoice(
+    invoice_number: int,
+    client: Client,
+    invoice_date: str,
+    due_date: str,
+    notes: str,
+    terms: str,
+    tax_percent: float,
+    items: list[InvoiceItem],
+) -> int:
+    """Overwrite an existing invoice header + line items (keeps canceled flag)."""
+    if invoice_number <= 0:
+        raise ValueError("Invalid invoice number.")
+    if not items:
+        raise ValueError("Invoice must contain at least one item.")
+
+    existing = load_invoice(invoice_number)
+    if existing is None:
+        raise ValueError(f"Invoice #{invoice_number} not found.")
+    if existing.get("canceled"):
+        raise ValueError(f"Invoice #{invoice_number} is canceled and cannot be edited.")
+
+    client_id = ensure_client(client)
+    with connect() as conn:
+        cur = conn.execute(
+            """
+            UPDATE invoiceDatas
+            SET id = ?, invoiceDate = ?, invoiceDue = ?, notes = ?, termsCondit = ?
+            WHERE invoiceNumber = ?
+            """,
+            (client_id, invoice_date, due_date, notes, terms, invoice_number),
+        )
+        if cur.rowcount != 1:
+            raise ValueError(f"Invoice #{invoice_number} not found.")
+        conn.execute("DELETE FROM itemsValues WHERE idInvoice = ?", (invoice_number,))
+        _insert_invoice_items(conn, invoice_number, tax_percent, items, canceled=0)
     return invoice_number
 
 
