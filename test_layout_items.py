@@ -85,7 +85,10 @@ class ScrollableMainTests(unittest.TestCase):
         # Items + footer live under main_scroll, not clipped outside it.
         body = str(self.app.main_scroll)
         self.assertTrue(str(self.app.items_card).startswith(body))
-        self.assertGreaterEqual(self.app.items_card.winfo_height(), 70)
         self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
-        self.assertGreaterEqual(int(self.app.items_frame.cget("height")), 30)
-        self.assertLessEqual(int(self.app.items_frame.cget("height")), 50)
+        # ITEMS_LIST_HEIGHT must actually control the list shell height.
+        import config
+
+        expected = int(config.ITEMS_LIST_HEIGHT)
+        self.assertEqual(int(self.app.items_list_shell.cget("height")), expected)
+        self.assertEqual(self.app.items_list_shell.winfo_height(), expected)
