@@ -71,12 +71,5 @@ COLORS = {
 
 FONT = "Segoe UI"
 WIDTH, HEIGHT = 1100, 780
-# Compact Items band (CTk height units): title + column header + ~1 row.
-ITEMS_MIN_HEIGHT = 108
-ITEMS_PREF_HEIGHT = 118
-ITEMS_MAX_HEIGHT = 128
-TOP_MAX_HEIGHT = 560
-TOP_MIN_HEIGHT = 200
-FOOTER_RESERVE = 96
-HEADER_RESERVE = 62
-LAYOUT_CHROME = 28
+# Preferred Items viewport when many rows are present (main window still scrolls).
+ITEMS_LIST_HEIGHT = 140
