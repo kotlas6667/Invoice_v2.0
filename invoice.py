@@ -380,7 +380,7 @@ class InvoiceApp(ctk.CTk):
         self.btn_save = ctk.CTkButton(
             actions,
             text="Save",
-            width=150,
+            width=110,
             fg_color="#0D9488",
             hover_color="#14B8A6",
             text_color="#FFFFFF",
@@ -388,6 +388,20 @@ class InvoiceApp(ctk.CTk):
             **btn_kw,
         )
         self.btn_save.pack(side="left", padx=4)
+
+        self.btn_cancel_invoice = ctk.CTkButton(
+            actions,
+            text="Cancel invoice",
+            width=130,
+            fg_color=COLORS["danger"],
+            hover_color="#B91C1C",
+            text_color="#FFFFFF",
+            command=self._cancel_invoice,
+            **btn_kw,
+        )
+        # Visible only when a saved (non-canceled) invoice is loaded.
+        self.btn_cancel_invoice.pack(side="left", padx=4)
+        self.btn_cancel_invoice.pack_forget()
 
     def _build_top_sections(self) -> None:
         wrap = ctk.CTkFrame(self, fg_color="transparent")
@@ -976,6 +990,7 @@ class InvoiceApp(ctk.CTk):
             fg_color="#0D9488",
             hover_color="#14B8A6",
         )
+        self.btn_cancel_invoice.pack_forget()
         self.lbl_canceled.grid_remove()
         self.fld_invoice_no.clear()
 
@@ -1022,62 +1037,96 @@ class InvoiceApp(ctk.CTk):
             if qty < 1:
                 messagebox.showerror("Error value", "Qty must be integer ≥ 1")
                 return False
-            if rate < 1:
-                messagebox.showerror("Error value", "Rate must be ≥ 1")
+            if rate <= 0:
+                messagebox.showerror("Error value", "Rate must be greater than 0")
                 return False
         return True
 
-    def _on_save_click(self) -> None:
-        if self.save_mode == "cancel":
-            self._cancel_invoice()
+    def _collect_client(self) -> db.Client:
+        return db.Client(
+            id=None,
+            name=self.txt_name_cst.get(),
+            surname=self.txt_surname_cst.get(),
+            company=self.fld_company_cst.get(),
+            address=self.fld_address_cst.get(),
+            city=self.fld_city_cst.get(),
+            zip=self.fld_zip_cst.get(),
+            country=self.fld_country_cst.get(),
+        )
+
+    def _collect_items(self) -> list[db.InvoiceItem]:
+        tax = self._parse_float(self.txt_tax.get())
+        items: list[db.InvoiceItem] = []
+        for row in self.item_rows:
+            qty = self._parse_int(row["qty"].get())
+            rate = self._parse_float(row["rate"].get())
+            items.append(
+                db.InvoiceItem(
+                    description=row["desc"].get().strip(),
+                    qty=qty,
+                    rate=rate,
+                    amount=qty * rate,
+                    sales_tax=tax,
+                )
+            )
+        return items
+
+    def _set_actions_for_invoice(self, *, canceled: bool) -> None:
+        """Save always writes; Cancel invoice is a separate action."""
+        self.save_mode = "save"
+        self.btn_cancel_invoice.pack_forget()
+        if canceled:
+            self.btn_save.configure(state="disabled")
             return
+        self.btn_save.configure(
+            text="Save",
+            state="normal",
+            fg_color="#0D9488",
+            hover_color="#14B8A6",
+        )
+        if self.loaded_invoice is not None:
+            self.btn_cancel_invoice.pack(side="left", padx=4)
+
+    def _on_save_click(self) -> None:
         self._save_invoice()
 
     def _save_invoice(self) -> None:
         if not self._validate():
             return
-        if self.fld_invoice_no.get().strip():
-            if not messagebox.askyesno(
-                "Invoice number is already exist",
-                "Do you want to create new Invoice data value?",
-            ):
-                return
         try:
-            client = db.Client(
-                id=None,
-                name=self.txt_name_cst.get(),
-                surname=self.txt_surname_cst.get(),
-                company=self.fld_company_cst.get(),
-                address=self.fld_address_cst.get(),
-                city=self.fld_city_cst.get(),
-                zip=self.fld_zip_cst.get(),
-                country=self.fld_country_cst.get(),
-            )
-            items = []
-            for row in self.item_rows:
-                qty = self._parse_int(row["qty"].get())
-                rate = self._parse_float(row["rate"].get())
-                items.append(
-                    db.InvoiceItem(
-                        description=row["desc"].get().strip(),
-                        qty=qty,
-                        rate=rate,
-                        amount=qty * rate,
-                        sales_tax=self._parse_float(self.txt_tax.get()),
-                    )
+            client = self._collect_client()
+            items = self._collect_items()
+            invoice_date = self.txt_invoice_date.get().strip()
+            due_date = self.txt_due_date.get().strip()
+            notes = self.txt_notes.get("1.0", "end").strip()
+            terms = self.txt_terms.get("1.0", "end").strip()
+            tax_percent = self._parse_float(self.txt_tax.get())
+
+            if self.loaded_invoice is not None:
+                number = db.update_invoice(
+                    invoice_number=self.loaded_invoice,
+                    client=client,
+                    invoice_date=invoice_date,
+                    due_date=due_date,
+                    notes=notes,
+                    terms=terms,
+                    tax_percent=tax_percent,
+                    items=items,
                 )
-            number = db.save_invoice(
-                client=client,
-                invoice_date=self.txt_invoice_date.get().strip(),
-                due_date=self.txt_due_date.get().strip(),
-                notes=self.txt_notes.get("1.0", "end").strip(),
-                terms=self.txt_terms.get("1.0", "end").strip(),
-                tax_percent=self._parse_float(self.txt_tax.get()),
-                items=items,
-            )
+            else:
+                number = db.save_invoice(
+                    client=client,
+                    invoice_date=invoice_date,
+                    due_date=due_date,
+                    notes=notes,
+                    terms=terms,
+                    tax_percent=tax_percent,
+                    items=items,
+                )
             self.fld_invoice_no.set(str(number))
             self.loaded_invoice = number
             self._reload_autocomplete()
+            self._set_actions_for_invoice(canceled=False)
             messagebox.showinfo("Data", "Data written")
         except ValueError as exc:
             messagebox.showerror("Error", str(exc))
@@ -1096,8 +1145,7 @@ class InvoiceApp(ctk.CTk):
             messagebox.showinfo("Canceled", "Successful Canceled !")
             self.lbl_canceled.configure(text="CANCELED")
             self.lbl_canceled.grid()
-            self.btn_save.configure(text="ALREADY CANCELED", state="disabled")
-            self.save_mode = "save"
+            self._set_actions_for_invoice(canceled=True)
         else:
             messagebox.showwarning("Canceled", "Unsuccessful operation Canceled !")
 
@@ -1134,17 +1182,10 @@ class InvoiceApp(ctk.CTk):
         if data["canceled"]:
             self.lbl_canceled.configure(text="CANCELED")
             self.lbl_canceled.grid()
-            self.btn_save.configure(text="ALREADY CANCELED", state="disabled")
-            self.save_mode = "save"
+            self._set_actions_for_invoice(canceled=True)
         else:
             self.lbl_canceled.grid_remove()
-            self.btn_save.configure(
-                text="CANCELED INVOICE ?",
-                state="normal",
-                fg_color=COLORS["danger"],
-                hover_color="#B91C1C",
-            )
-            self.save_mode = "cancel"
+            self._set_actions_for_invoice(canceled=False)
 
 
 if __name__ == "__main__":
