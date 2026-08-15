@@ -49,6 +49,12 @@ class ItemsLayoutTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         try:
+            if getattr(self.app, "_layout_after_id", None) is not None:
+                try:
+                    self.app.after_cancel(self.app._layout_after_id)
+                except Exception:
+                    pass
+            self.app.unbind("<Configure>")
             self.app.destroy()
         except Exception:
             pass
