@@ -73,22 +73,28 @@ class ItemsLayoutTests(unittest.TestCase):
         self._settle("1100x720+10+10")
         card = self.app.items_card
         kids = card.winfo_children()
-        self.assertGreaterEqual(card.winfo_height(), 200)
+        self.assertGreaterEqual(card.winfo_height(), 90)
+        self.assertLessEqual(card.winfo_height(), 220)
         self.assertGreaterEqual(kids[1].winfo_height(), 20)  # column headers
-        self.assertGreaterEqual(kids[2].winfo_height(), 80)  # rows viewport
         self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
         self.assertLess(
-            card.winfo_rooty() + 50,
+            card.winfo_rooty() + 30,
             self.app.winfo_rooty() + self.app.winfo_height(),
         )
 
     def test_items_visible_on_tighter_window(self) -> None:
         self._settle("1100x640+10+10")
         card = self.app.items_card
-        kids = card.winfo_children()
-        self.assertGreaterEqual(card.winfo_height(), 200)
-        self.assertGreaterEqual(kids[2].winfo_height(), 80)
-        self.assertLessEqual(self.app.top_container.winfo_height(), 360)
+        self.assertGreaterEqual(card.winfo_height(), 90)
+        self.assertLessEqual(card.winfo_height(), 220)
+        self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
+
+    def test_items_stays_compact_on_tall_window(self) -> None:
+        self._settle("1100x900+10+10")
+        card = self.app.items_card
+        # Must not grow into a huge empty band when the window is tall.
+        self.assertLessEqual(card.winfo_height(), 220)
+        self.assertGreaterEqual(self.app.top_container.winfo_height(), card.winfo_height())
 
 
 if __name__ == "__main__":
