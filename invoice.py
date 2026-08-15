@@ -702,13 +702,22 @@ class InvoiceApp(ctk.CTk):
                 width=40 if i == 0 else (0 if i == 1 else 90),
             ).grid(row=0, column=i, sticky=sticky, padx=6, pady=8)
 
-        # Inner list scrolls only when many rows; the main window also scrolls.
-        self.items_frame = ctk.CTkScrollableFrame(
+        # Height must be enforced on a shell: CTkScrollableFrame ignores height when packed alone.
+        self.items_list_shell = ctk.CTkFrame(
             card,
             fg_color="transparent",
             height=ITEMS_LIST_HEIGHT,
+            corner_radius=0,
         )
-        self.items_frame.pack(fill="x", padx=10, pady=(4, 10))
+        self.items_list_shell.pack(fill="x", padx=10, pady=(4, 10))
+        self.items_list_shell.pack_propagate(False)
+
+        self.items_frame = ctk.CTkScrollableFrame(
+            self.items_list_shell,
+            fg_color="transparent",
+            corner_radius=0,
+        )
+        self.items_frame.pack(fill="both", expand=True)
         self.items_frame.grid_columnconfigure(0, weight=1)
 
     def _cols(self, frame: ctk.CTkFrame) -> None:
