@@ -85,6 +85,7 @@ class ScrollableMainTests(unittest.TestCase):
         # Items + footer live under main_scroll, not clipped outside it.
         body = str(self.app.main_scroll)
         self.assertTrue(str(self.app.items_card).startswith(body))
-        self.assertGreaterEqual(self.app.items_card.winfo_height(), 100)
+        self.assertGreaterEqual(self.app.items_card.winfo_height(), 80)
         self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
-        self.assertGreaterEqual(int(self.app.items_frame.cget("height")), 100)
+        self.assertGreaterEqual(int(self.app.items_frame.cget("height")), 60)
+        self.assertLessEqual(int(self.app.items_frame.cget("height")), 90)
