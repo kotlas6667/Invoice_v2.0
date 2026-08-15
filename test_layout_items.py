@@ -1,4 +1,4 @@
-"""Regression: Items box must stay visible on short / scaled screens."""
+"""Regression: main form must be scrollable on short / scaled screens."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Xvfb layout check is Linux-only")
-class ItemsLayoutTests(unittest.TestCase):
+class ScrollableMainTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         os.environ["DISPLAY"] = ":99"
@@ -49,12 +49,6 @@ class ItemsLayoutTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         try:
-            if getattr(self.app, "_layout_after_id", None) is not None:
-                try:
-                    self.app.after_cancel(self.app._layout_after_id)
-                except Exception:
-                    pass
-            self.app.unbind("<Configure>")
             self.app.destroy()
         except Exception:
             pass
@@ -65,37 +59,32 @@ class ItemsLayoutTests(unittest.TestCase):
         for _ in range(3):
             self.app.update()
             self.app.update_idletasks()
-            self.app._apply_responsive_layout()
-            self.app.update()
 
-    def test_items_visible_at_1080p_150_percent_logical_height(self) -> None:
-        # 1920x1080 @ 150% ≈ 1280x720 logical workspace.
-        self._settle("1100x720+10+10")
-        card = self.app.items_card
-        kids = card.winfo_children()
-        self.assertGreaterEqual(card.winfo_height(), 90)
-        self.assertLessEqual(card.winfo_height(), 220)
-        self.assertGreaterEqual(kids[1].winfo_height(), 20)  # column headers
-        self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
-        self.assertLess(
-            card.winfo_rooty() + 30,
-            self.app.winfo_rooty() + self.app.winfo_height(),
-        )
-
-    def test_items_visible_on_tighter_window(self) -> None:
+    def test_main_scroll_exists_and_contains_sections(self) -> None:
         self._settle("1100x640+10+10")
-        card = self.app.items_card
-        self.assertGreaterEqual(card.winfo_height(), 90)
-        self.assertLessEqual(card.winfo_height(), 220)
+        self.assertTrue(hasattr(self.app, "main_scroll"))
+        self.assertTrue(self.app.main_scroll.winfo_ismapped())
+        self.assertTrue(self.app.items_card.winfo_ismapped())
+        self.assertGreater(len(self.app.item_rows), 0)
         self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
 
-    def test_items_stays_compact_on_tall_window(self) -> None:
-        self._settle("1100x900+10+10")
-        card = self.app.items_card
-        # Must not grow into a huge empty band when the window is tall.
-        self.assertLessEqual(card.winfo_height(), 220)
-        self.assertGreaterEqual(self.app.top_container.winfo_height(), card.winfo_height())
+    def test_can_scroll_content_on_short_window(self) -> None:
+        self._settle("1100x620+10+10")
+        canvas = getattr(self.app.main_scroll, "_parent_canvas", None)
+        self.assertIsNotNone(canvas)
+        # Content should be taller than the short viewport so scrolling is possible.
+        self.app.update_idletasks()
+        bbox = canvas.bbox("all")
+        self.assertIsNotNone(bbox)
+        content_h = bbox[3] - bbox[1]
+        view_h = canvas.winfo_height()
+        self.assertGreater(content_h, view_h - 20)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_item_row_and_totals_are_in_scroll_body(self) -> None:
+        self._settle("1100x720+10+10")
+        # Items + footer live under main_scroll, not clipped outside it.
+        body = str(self.app.main_scroll)
+        self.assertTrue(str(self.app.items_card).startswith(body))
+        self.assertGreaterEqual(self.app.items_card.winfo_height(), 100)
+        self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
+        self.assertGreaterEqual(int(self.app.items_frame.cget("height")), 100)
