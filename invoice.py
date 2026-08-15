@@ -19,7 +19,13 @@ from config import (
     DEFAULT_ITEM,
     DEFAULT_TAX_PERCENT,
     FONT,
+    FOOTER_RESERVE,
+    HEADER_RESERVE,
     HEIGHT,
+    ITEMS_MIN_HEIGHT,
+    LAYOUT_CHROME,
+    TOP_MAX_HEIGHT,
+    TOP_MIN_HEIGHT,
     WIDTH,
     load_company,
     save_company,
@@ -293,30 +299,82 @@ class InvoiceApp(ctk.CTk):
         super().__init__()
         self.title("Invoice")
         self.configure(fg_color=COLORS["bg"])
-        self._center(WIDTH, HEIGHT)
-        self.minsize(960, 680)
+        self.minsize(900, 620)
 
         db.init_db()
         self.clients: list[db.Client] = []
         self.item_rows: list[dict] = []
         self.loaded_invoice: Optional[int] = None
         self.save_mode = "save"  # save | cancel
+        self._layout_after_id: Optional[str] = None
 
         self._build()
+        self._fit_window_to_screen()
         self._reload_autocomplete()
         self._new_invoice(confirm=False)
+        self.bind("<Configure>", self._on_root_configure)
+        self.after(50, self._apply_responsive_layout)
+
+    def _fit_window_to_screen(self) -> None:
+        """Size window for short logical screens (1920x1080 @ 150% ≈ 1280x720)."""
+        self.update_idletasks()
+        sw = max(self.winfo_screenwidth(), 800)
+        sh = max(self.winfo_screenheight(), 600)
+        w = min(WIDTH, max(900, sw - 40))
+        h = min(HEIGHT, max(620, sh - 80))
+        self.minsize(min(900, w), min(620, h))
+        self._center(w, h)
 
     def _center(self, w: int, h: int) -> None:
         self.update_idletasks()
         x = (self.winfo_screenwidth() // 2) - (w // 2)
-        y = (self.winfo_screenheight() // 2) - (h // 2)
+        y = max(0, (self.winfo_screenheight() // 2) - (h // 2))
         self.geometry(f"{w}x{h}+{x}+{y}")
+
+    def _on_root_configure(self, event) -> None:
+        if event.widget is not self:
+            return
+        if self._layout_after_id is not None:
+            try:
+                self.after_cancel(self._layout_after_id)
+            except Exception:
+                pass
+        self._layout_after_id = self.after(80, self._apply_responsive_layout)
+
+    def _apply_responsive_layout(self) -> None:
+        """Keep Items box visible: cap top panels, guarantee items min height."""
+        self._layout_after_id = None
+        try:
+            total_h = int(self.winfo_height())
+        except Exception:
+            return
+        if total_h < 100:
+            return
+
+        reserved = HEADER_RESERVE + FOOTER_RESERVE + LAYOUT_CHROME + ITEMS_MIN_HEIGHT
+        top_h = max(TOP_MIN_HEIGHT, min(TOP_MAX_HEIGHT, total_h - reserved))
+        if hasattr(self, "top_container"):
+            self.top_container.configure(height=top_h)
+            self.top_container.grid_propagate(False)
+
+        # Floor height for the whole Items card (title + columns + rows).
+        chrome_in_card = 90
+        items_area = max(
+            ITEMS_MIN_HEIGHT,
+            total_h - HEADER_RESERVE - FOOTER_RESERVE - LAYOUT_CHROME - top_h,
+        )
+        if hasattr(self, "items_card"):
+            self.items_card.configure(height=items_area)
+            self.items_card.grid_propagate(False)
+        if hasattr(self, "items_frame"):
+            self.items_frame.configure(height=max(120, items_area - chrome_in_card))
 
     # ── UI ──────────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(2, weight=1, minsize=ITEMS_MIN_HEIGHT)
         self._build_header()
         self._build_top_sections()
         self._build_items_section()
@@ -404,9 +462,24 @@ class InvoiceApp(ctk.CTk):
         self.btn_cancel_invoice.pack_forget()
 
     def _build_top_sections(self) -> None:
-        wrap = ctk.CTkFrame(self, fg_color="transparent")
-        wrap.grid(row=1, column=0, sticky="ew", padx=16, pady=(14, 6))
-        wrap.grid_columnconfigure((0, 1, 2), weight=1, uniform="c")
+        # Fixed-height shell so From/Bill to/Invoice cannot crush the Items box.
+        self.top_container = ctk.CTkFrame(
+            self,
+            fg_color="transparent",
+            height=TOP_MAX_HEIGHT,
+            corner_radius=0,
+        )
+        self.top_container.grid(row=1, column=0, sticky="ew", padx=16, pady=(14, 6))
+        self.top_container.grid_propagate(False)
+
+        self.top_wrap = ctk.CTkScrollableFrame(
+            self.top_container,
+            fg_color="transparent",
+            corner_radius=0,
+        )
+        self.top_wrap.pack(fill="both", expand=True)
+        self.top_wrap.grid_columnconfigure((0, 1, 2), weight=1, uniform="c")
+        wrap = self.top_wrap
 
         # From / Company
         from_card = Section(wrap, "From", COLORS["accent"])
@@ -599,7 +672,7 @@ class InvoiceApp(ctk.CTk):
         ).grid(row=4, column=0, sticky="w", pady=(8, 2))
         self.txt_notes = ctk.CTkTextbox(
             inv.body,
-            height=56,
+            height=44,
             corner_radius=8,
             fg_color=COLORS["surface_alt"],
             border_color=COLORS["border"],
@@ -617,7 +690,7 @@ class InvoiceApp(ctk.CTk):
         ).grid(row=6, column=0, sticky="w", pady=(8, 2))
         self.txt_terms = ctk.CTkTextbox(
             inv.body,
-            height=56,
+            height=44,
             corner_radius=8,
             fg_color=COLORS["surface_alt"],
             border_color=COLORS["border"],
@@ -627,22 +700,23 @@ class InvoiceApp(ctk.CTk):
         self.txt_terms.grid(row=7, column=0, sticky="ew")
 
     def _build_items_section(self) -> None:
-        card = ctk.CTkFrame(
+        self.items_card = ctk.CTkFrame(
             self,
             fg_color=COLORS["surface"],
             corner_radius=14,
             border_width=1,
             border_color=COLORS["border"],
+            height=ITEMS_MIN_HEIGHT,
         )
+        card = self.items_card
         card.grid(row=2, column=0, sticky="nsew", padx=16, pady=6)
-        card.grid_columnconfigure(0, weight=1)
-        card.grid_rowconfigure(2, weight=1)
+        # Prevent children from collapsing the card on short / scaled screens.
+        card.grid_propagate(False)
 
         head = ctk.CTkFrame(card, fg_color="transparent")
-        head.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 4))
-        head.grid_columnconfigure(0, weight=1)
+        head.pack(fill="x", padx=16, pady=(12, 4))
         title = ctk.CTkFrame(head, fg_color="transparent")
-        title.grid(row=0, column=0, sticky="w")
+        title.pack(side="left")
         ctk.CTkFrame(
             title, width=4, height=18, corner_radius=2, fg_color=COLORS["accent"]
         ).pack(side="left", padx=(0, 10))
@@ -662,10 +736,10 @@ class InvoiceApp(ctk.CTk):
             hover_color=COLORS["accent_hover"],
             font=ctk.CTkFont(family=FONT, size=12, weight="bold"),
             command=lambda: self._add_item_row(DEFAULT_ITEM, "1", "0"),
-        ).grid(row=0, column=1, sticky="e")
+        ).pack(side="right")
 
         header = ctk.CTkFrame(card, fg_color=COLORS["surface_alt"], corner_radius=8)
-        header.grid(row=1, column=0, sticky="ew", padx=16, pady=(4, 0))
+        header.pack(fill="x", padx=16, pady=(4, 0))
         self._cols(header)
         for i, (text, sticky) in enumerate(
             [
@@ -686,8 +760,12 @@ class InvoiceApp(ctk.CTk):
                 width=40 if i == 0 else (0 if i == 1 else 90),
             ).grid(row=0, column=i, sticky=sticky, padx=6, pady=8)
 
-        self.items_frame = ctk.CTkScrollableFrame(card, fg_color="transparent")
-        self.items_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 10))
+        self.items_frame = ctk.CTkScrollableFrame(
+            card,
+            fg_color="transparent",
+            height=140,
+        )
+        self.items_frame.pack(fill="both", expand=True, padx=10, pady=(4, 10))
         self.items_frame.grid_columnconfigure(0, weight=1)
 
     def _cols(self, frame: ctk.CTkFrame) -> None:
