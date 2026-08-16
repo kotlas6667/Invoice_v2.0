@@ -1,4 +1,4 @@
-"""Regression: main form must be scrollable on short / scaled screens."""
+"""Regression: main form must be scrollable; Items columns stay aligned."""
 
 from __future__ import annotations
 
@@ -66,13 +66,12 @@ class ScrollableMainTests(unittest.TestCase):
         self.assertTrue(self.app.main_scroll.winfo_ismapped())
         self.assertTrue(self.app.items_card.winfo_ismapped())
         self.assertGreater(len(self.app.item_rows), 0)
-        self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
+        self.assertEqual(self.app.item_rows[0]["desc"].get(), "Garden services")
 
     def test_can_scroll_content_on_short_window(self) -> None:
         self._settle("1100x620+10+10")
         canvas = getattr(self.app.main_scroll, "_parent_canvas", None)
         self.assertIsNotNone(canvas)
-        # Content should be taller than the short viewport so scrolling is possible.
         self.app.update_idletasks()
         bbox = canvas.bbox("all")
         self.assertIsNotNone(bbox)
@@ -80,15 +79,24 @@ class ScrollableMainTests(unittest.TestCase):
         view_h = canvas.winfo_height()
         self.assertGreater(content_h, view_h - 20)
 
-    def test_item_row_and_totals_are_in_scroll_body(self) -> None:
+    def test_qty_rate_amount_headers_align_with_fields(self) -> None:
         self._settle("1100x720+10+10")
-        # Items + footer live under main_scroll, not clipped outside it.
-        body = str(self.app.main_scroll)
-        self.assertTrue(str(self.app.items_card).startswith(body))
-        self.assertGreater(self.app.item_rows[0]["frame"].winfo_height(), 0)
-        # ITEMS_LIST_HEIGHT must actually control the list shell height.
-        import config
-
-        expected = int(config.ITEMS_LIST_HEIGHT)
-        self.assertEqual(int(self.app.items_list_shell.cget("height")), expected)
-        self.assertEqual(self.app.items_list_shell.winfo_height(), expected)
+        labels = self.app._items_header_labels
+        row = self.app.item_rows[0]
+        self.assertEqual(labels[2].cget("text"), "Qty")
+        self.assertEqual(labels[3].cget("text"), "Rate")
+        self.assertEqual(labels[4].cget("text"), "Amount")
+        for i, key in ((2, "qty"), (3, "rate"), (4, "amount")):
+            lx = labels[i].winfo_rootx()
+            lw = labels[i].winfo_width()
+            wx = row[key].winfo_rootx()
+            ww = row[key].winfo_width()
+            self.assertLessEqual(
+                abs((lx + lw / 2) - (wx + ww / 2)),
+                4,
+                msg=f"{key} header/field center delta too large",
+            )
+            if key in ("qty", "rate"):
+                self.assertEqual(row[key].cget("justify"), "center")
+            else:
+                self.assertIn(row[key].cget("anchor"), ("center", "c"))

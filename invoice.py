@@ -20,7 +20,6 @@ from config import (
     DEFAULT_TAX_PERCENT,
     FONT,
     HEIGHT,
-    ITEMS_LIST_HEIGHT,
     WIDTH,
     load_company,
     save_company,
@@ -680,13 +679,16 @@ class InvoiceApp(ctk.CTk):
             command=lambda: self._add_item_row(DEFAULT_ITEM, "1", "0"),
         ).pack(side="right")
 
-        header = ctk.CTkFrame(card, fg_color=COLORS["surface_alt"], corner_radius=8)
-        header.pack(fill="x", padx=16, pady=(4, 0))
-        self._cols(header)
-        # Widths match the item row widgets so Qty/Rate/Amount sit above the fields.
+        # Shared table grid: header labels and item fields use the same columns.
+        self.items_table = ctk.CTkFrame(card, fg_color="transparent")
+        self.items_table.pack(fill="x", padx=16, pady=(4, 12))
+        self._cols(self.items_table)
+        self.items_frame = self.items_table
+
+        self._items_header_labels = []
         for i, (text, width, anchor) in enumerate(
             [
-                ("#", 36, "w"),
+                ("#", 36, "center"),
                 ("Item Description", 0, "w"),
                 ("Qty", 90, "center"),
                 ("Rate", 100, "center"),
@@ -695,33 +697,19 @@ class InvoiceApp(ctk.CTk):
             ]
         ):
             lbl = ctk.CTkLabel(
-                header,
+                self.items_table,
                 text=text,
                 font=ctk.CTkFont(family=FONT, size=11, weight="bold"),
                 text_color=COLORS["text_muted"],
+                fg_color=COLORS["surface_alt"],
+                corner_radius=6,
                 anchor=anchor,
+                height=32,
                 width=width if width else 1,
             )
             sticky = "ew" if i == 1 else ""
-            lbl.grid(row=0, column=i, sticky=sticky, padx=4, pady=8)
-
-        # Height must be enforced on a shell: CTkScrollableFrame ignores height when packed alone.
-        self.items_list_shell = ctk.CTkFrame(
-            card,
-            fg_color="transparent",
-            height=ITEMS_LIST_HEIGHT,
-            corner_radius=0,
-        )
-        self.items_list_shell.pack(fill="x", padx=10, pady=(4, 10))
-        self.items_list_shell.pack_propagate(False)
-
-        self.items_frame = ctk.CTkScrollableFrame(
-            self.items_list_shell,
-            fg_color="transparent",
-            corner_radius=0,
-        )
-        self.items_frame.pack(fill="both", expand=True)
-        self.items_frame.grid_columnconfigure(0, weight=1)
+            lbl.grid(row=0, column=i, sticky=sticky, padx=4, pady=(0, 6))
+            self._items_header_labels.append(lbl)
 
     def _cols(self, frame: ctk.CTkFrame) -> None:
         frame.grid_columnconfigure(0, minsize=36, weight=0)
@@ -818,14 +806,15 @@ class InvoiceApp(ctk.CTk):
 
     def _clear_items(self) -> None:
         for row in list(self.item_rows):
-            row["frame"].destroy()
+            for key in ("num", "desc", "qty", "rate", "amount", "delete"):
+                widget = row.get(key)
+                if widget is not None:
+                    widget.destroy()
         self.item_rows.clear()
 
     def _add_item_row(self, desc: str = "", qty: str = "1", rate: str = "0") -> None:
         idx = len(self.item_rows)
-        frame = ctk.CTkFrame(self.items_frame, fg_color="transparent")
-        frame.grid(row=idx, column=0, sticky="ew", pady=2)
-        self._cols(frame)
+        grid_row = idx + 1  # row 0 = column headers
 
         entry_kw = dict(
             height=30,
@@ -838,29 +827,29 @@ class InvoiceApp(ctk.CTk):
         )
 
         num = ctk.CTkLabel(
-            frame,
+            self.items_table,
             text=str(idx + 1),
             width=36,
-            anchor="w",
+            anchor="center",
             text_color=COLORS["text_muted"],
             font=ctk.CTkFont(family=FONT, size=12),
         )
-        num.grid(row=0, column=0, padx=4)
+        num.grid(row=grid_row, column=0, padx=4, pady=2)
 
-        desc_e = ctk.CTkEntry(frame, **entry_kw)
-        desc_e.grid(row=0, column=1, sticky="ew", padx=4)
+        desc_e = ctk.CTkEntry(self.items_table, **entry_kw)
+        desc_e.grid(row=grid_row, column=1, sticky="ew", padx=4, pady=2)
         desc_e.insert(0, desc)
 
-        qty_e = ctk.CTkEntry(frame, width=90, justify="center", **entry_kw)
-        qty_e.grid(row=0, column=2, padx=4)
+        qty_e = ctk.CTkEntry(self.items_table, width=90, justify="center", **entry_kw)
+        qty_e.grid(row=grid_row, column=2, padx=4, pady=2)
         qty_e.insert(0, qty)
 
-        rate_e = ctk.CTkEntry(frame, width=100, justify="center", **entry_kw)
-        rate_e.grid(row=0, column=3, padx=4)
+        rate_e = ctk.CTkEntry(self.items_table, width=100, justify="center", **entry_kw)
+        rate_e.grid(row=grid_row, column=3, padx=4, pady=2)
         rate_e.insert(0, rate)
 
         amount_l = ctk.CTkLabel(
-            frame,
+            self.items_table,
             text="0.00",
             width=110,
             anchor="center",
@@ -868,15 +857,15 @@ class InvoiceApp(ctk.CTk):
             font=ctk.CTkFont(family=FONT, size=12, weight="bold"),
             text_color=COLORS["text"],
         )
-        amount_l.grid(row=0, column=4, padx=4)
+        amount_l.grid(row=grid_row, column=4, padx=4, pady=2)
 
         row = {
-            "frame": frame,
             "num": num,
             "desc": desc_e,
             "qty": qty_e,
             "rate": rate_e,
             "amount": amount_l,
+            "delete": None,
         }
 
         def on_change(_=None):
@@ -887,8 +876,8 @@ class InvoiceApp(ctk.CTk):
             e.bind("<KeyRelease>", on_change)
             e.bind("<FocusOut>", on_change)
 
-        ctk.CTkButton(
-            frame,
+        delete_btn = ctk.CTkButton(
+            self.items_table,
             text="×",
             width=32,
             height=28,
@@ -898,7 +887,9 @@ class InvoiceApp(ctk.CTk):
             text_color=COLORS["danger"],
             font=ctk.CTkFont(family=FONT, size=16, weight="bold"),
             command=lambda r=row: self._remove_item(r),
-        ).grid(row=0, column=5, padx=4)
+        )
+        delete_btn.grid(row=grid_row, column=5, padx=4, pady=2)
+        row["delete"] = delete_btn
 
         self.item_rows.append(row)
         self._recalc_row(row)
@@ -909,15 +900,24 @@ class InvoiceApp(ctk.CTk):
         if len(self.item_rows) <= 1:
             messagebox.showinfo("Items", "Invoice must contain at least one item.")
             return
-        row["frame"].destroy()
+        for key in ("num", "desc", "qty", "rate", "amount", "delete"):
+            widget = row.get(key)
+            if widget is not None:
+                widget.destroy()
         self.item_rows.remove(row)
         self._renumber()
         self._recalc_totals()
 
     def _renumber(self) -> None:
         for i, row in enumerate(self.item_rows):
+            grid_row = i + 1
             row["num"].configure(text=str(i + 1))
-            row["frame"].grid(row=i, column=0, sticky="ew", pady=2)
+            row["num"].grid(row=grid_row, column=0, padx=4, pady=2)
+            row["desc"].grid(row=grid_row, column=1, sticky="ew", padx=4, pady=2)
+            row["qty"].grid(row=grid_row, column=2, padx=4, pady=2)
+            row["rate"].grid(row=grid_row, column=3, padx=4, pady=2)
+            row["amount"].grid(row=grid_row, column=4, padx=4, pady=2)
+            row["delete"].grid(row=grid_row, column=5, padx=4, pady=2)
 
     @staticmethod
     def _parse_float(text: str) -> float:

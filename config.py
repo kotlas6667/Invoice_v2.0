@@ -71,5 +71,3 @@ COLORS = {
 
 FONT = "Segoe UI"
 WIDTH, HEIGHT = 1100, 780
-# Preferred Items list viewport (~1 row; main window still scrolls).
-ITEMS_LIST_HEIGHT = 36
