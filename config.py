@@ -45,7 +45,7 @@ def save_company(values: dict[str, str]) -> None:
 
 COMPANY = load_company()
 
-DEFAULT_ITEM = "Gardening"
+DEFAULT_ITEM = "Garden services"
 DEFAULT_CLIENT_COUNTRY = ""
 DEFAULT_TAX_PERCENT = "0"
 CURRENCY = "£"

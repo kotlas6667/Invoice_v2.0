@@ -683,24 +683,27 @@ class InvoiceApp(ctk.CTk):
         header = ctk.CTkFrame(card, fg_color=COLORS["surface_alt"], corner_radius=8)
         header.pack(fill="x", padx=16, pady=(4, 0))
         self._cols(header)
-        for i, (text, sticky) in enumerate(
+        # Widths match the item row widgets so Qty/Rate/Amount sit above the fields.
+        for i, (text, width, anchor) in enumerate(
             [
-                ("#", "w"),
-                ("Item Description", "ew"),
-                ("Qty", ""),
-                ("Rate", ""),
-                ("Amount", ""),
-                ("", "w"),
+                ("#", 36, "w"),
+                ("Item Description", 0, "w"),
+                ("Qty", 90, "center"),
+                ("Rate", 100, "center"),
+                ("Amount", 110, "center"),
+                ("", 32, "center"),
             ]
         ):
-            ctk.CTkLabel(
+            lbl = ctk.CTkLabel(
                 header,
                 text=text,
                 font=ctk.CTkFont(family=FONT, size=11, weight="bold"),
                 text_color=COLORS["text_muted"],
-                anchor="center" if i in (2, 3, 4) else "w",
-                width=40 if i == 0 else (0 if i == 1 else 90),
-            ).grid(row=0, column=i, sticky=sticky or "ew", padx=6, pady=8)
+                anchor=anchor,
+                width=width if width else 1,
+            )
+            sticky = "ew" if i == 1 else ""
+            lbl.grid(row=0, column=i, sticky=sticky, padx=4, pady=8)
 
         # Height must be enforced on a shell: CTkScrollableFrame ignores height when packed alone.
         self.items_list_shell = ctk.CTkFrame(
@@ -726,7 +729,7 @@ class InvoiceApp(ctk.CTk):
         frame.grid_columnconfigure(2, minsize=90, weight=0)
         frame.grid_columnconfigure(3, minsize=100, weight=0)
         frame.grid_columnconfigure(4, minsize=110, weight=0)
-        frame.grid_columnconfigure(5, minsize=40, weight=0)
+        frame.grid_columnconfigure(5, minsize=32, weight=0)
 
     def _build_footer(self) -> None:
         foot = ctk.CTkFrame(self._body, fg_color="transparent")
@@ -838,6 +841,7 @@ class InvoiceApp(ctk.CTk):
             frame,
             text=str(idx + 1),
             width=36,
+            anchor="w",
             text_color=COLORS["text_muted"],
             font=ctk.CTkFont(family=FONT, size=12),
         )
@@ -860,6 +864,7 @@ class InvoiceApp(ctk.CTk):
             text="0.00",
             width=110,
             anchor="center",
+            justify="center",
             font=ctk.CTkFont(family=FONT, size=12, weight="bold"),
             text_color=COLORS["text"],
         )
