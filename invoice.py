@@ -687,9 +687,9 @@ class InvoiceApp(ctk.CTk):
             [
                 ("#", "w"),
                 ("Item Description", "ew"),
-                ("Qty", "w"),
-                ("Rate", "w"),
-                ("Amount", "w"),
+                ("Qty", ""),
+                ("Rate", ""),
+                ("Amount", ""),
                 ("", "w"),
             ]
         ):
@@ -698,9 +698,9 @@ class InvoiceApp(ctk.CTk):
                 text=text,
                 font=ctk.CTkFont(family=FONT, size=11, weight="bold"),
                 text_color=COLORS["text_muted"],
-                anchor="w",
+                anchor="center" if i in (2, 3, 4) else "w",
                 width=40 if i == 0 else (0 if i == 1 else 90),
-            ).grid(row=0, column=i, sticky=sticky, padx=6, pady=8)
+            ).grid(row=0, column=i, sticky=sticky or "ew", padx=6, pady=8)
 
         # Height must be enforced on a shell: CTkScrollableFrame ignores height when packed alone.
         self.items_list_shell = ctk.CTkFrame(
@@ -847,11 +847,11 @@ class InvoiceApp(ctk.CTk):
         desc_e.grid(row=0, column=1, sticky="ew", padx=4)
         desc_e.insert(0, desc)
 
-        qty_e = ctk.CTkEntry(frame, width=90, justify="right", **entry_kw)
+        qty_e = ctk.CTkEntry(frame, width=90, justify="center", **entry_kw)
         qty_e.grid(row=0, column=2, padx=4)
         qty_e.insert(0, qty)
 
-        rate_e = ctk.CTkEntry(frame, width=100, justify="right", **entry_kw)
+        rate_e = ctk.CTkEntry(frame, width=100, justify="center", **entry_kw)
         rate_e.grid(row=0, column=3, padx=4)
         rate_e.insert(0, rate)
 
@@ -859,7 +859,7 @@ class InvoiceApp(ctk.CTk):
             frame,
             text="0.00",
             width=110,
-            anchor="e",
+            anchor="center",
             font=ctk.CTkFont(family=FONT, size=12, weight="bold"),
             text_color=COLORS["text"],
         )
